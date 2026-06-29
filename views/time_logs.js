@@ -40,9 +40,14 @@ function renderClockInOut(db, account, onDbChange) {
     return page;
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  // Use local date (not UTC) so it matches the server-stored PH date.
+  const _now = new Date();
+  const today = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,"0")}-${String(_now.getDate()).padStart(2,"0")}`;
+  // Use == (not ===) for employee_id to handle string/integer type mismatch
+  // between what the API returns vs what account.employee_id holds.
   let openLog = db.timeLogs.find(
-    l => l.employee_id === empId && l.clock_in.startsWith(today) && !l.clock_out
+    // eslint-disable-next-line eqeqeq
+    l => l.employee_id == empId && l.clock_in.startsWith(today) && !l.clock_out
   ) || null;
 
   // ── Layout: two columns ──────────────────────────────
@@ -134,10 +139,13 @@ function renderClockInOut(db, account, onDbChange) {
         try {
           const shiftId = parseInt(document.getElementById("shift-sel-main").value);
           const result  = await clockInRequest(shiftId);
-          const updated = [result, ...db.timeLogs];
+          // Normalise employee_id type to match empId so the find() at the top
+          // of renderClockInOut always locates this log after a page refresh.
+          const normResult = { ...result, employee_id: empId };
+          const updated = [normResult, ...db.timeLogs];
           db = { ...db, timeLogs: updated };
           onDbChange(db);
-          refreshClock(result);
+          refreshClock(normResult);
           refreshTodayLogs();
           showToast("Clocked in successfully!", "success");
         } catch (err) {
@@ -222,8 +230,9 @@ function renderClockInOut(db, account, onDbChange) {
 
   function refreshTodayLogs() {
     todayLogsEl.innerHTML = "";
+    // eslint-disable-next-line eqeqeq
     const todayLogs = db.timeLogs.filter(
-      l => l.employee_id === empId && l.clock_in.startsWith(today)
+      l => l.employee_id == empId && l.clock_in.startsWith(today)
     );
 
     if (!todayLogs.length) {
