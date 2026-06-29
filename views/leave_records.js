@@ -117,6 +117,12 @@ function renderLeaveRecords(db, account, onDbChange) {
       actions.style.gap = "6px";
 
       if (isAdmin) {
+        const viewBtn = document.createElement("button");
+        viewBtn.className = "btn btn-ghost btn-sm";
+        viewBtn.innerHTML = `${icons.eye} View`;
+        viewBtn.addEventListener("click", () => openLeaveDetailsModal(l));
+        actions.appendChild(viewBtn);
+
         // Approve button
         if (l.leave_status === "Pending") {
           const approveBtn = document.createElement("button");
@@ -171,9 +177,12 @@ function renderLeaveRecords(db, account, onDbChange) {
       if (isAdmin) {
         const empCell = document.createElement("div");
         empCell.className = "emp-cell";
+        empCell.style.cursor = "pointer";
+        empCell.title = "View full details";
         empCell.innerHTML = l.full_name
           ? `${avatarHTML(l.full_name, "sm")}<span class="text-sm font-medium">${l.full_name}</span>`
           : `<span class="text-xs text-gray">Unknown</span>`;
+        empCell.addEventListener("click", () => openLeaveDetailsModal(l));
         return [empCell, ...baseRow];
       }
 
@@ -212,6 +221,121 @@ function renderLeaveRecords(db, account, onDbChange) {
     } catch (err) {
       showToast(err.message || "Could not delete record.", "error");
     }
+  }
+
+  // ── Admin: full leave details modal ──────────────────
+  function openLeaveDetailsModal(leave) {
+    const emp = db.employees.find(e => e.employee_id === leave.employee_id) || null;
+    const name = leave.full_name || (emp ? emp.full_name : "Unknown Employee");
+
+    const body = document.createElement("div");
+
+    // Employee info
+    const empSection = document.createElement("div");
+    empSection.innerHTML = `<div class="detail-section-title">Employee</div>`;
+
+    const empHeader = document.createElement("div");
+    empHeader.className = "detail-employee";
+    const subParts = [emp?.role_name, emp?.department_name].filter(Boolean);
+    empHeader.innerHTML = `
+      ${avatarHTML(name, "md")}
+      <div>
+        <div class="detail-employee-name">${name}</div>
+        <div class="detail-employee-sub">${subParts.length ? subParts.join(" · ") : "—"}</div>
+      </div>
+    `;
+    empSection.appendChild(empHeader);
+
+    const empGrid = document.createElement("div");
+    empGrid.className = "detail-grid";
+    empGrid.appendChild(detailItem("Department", emp?.department_name || "—"));
+    empGrid.appendChild(detailItem("Role", emp?.role_name || "—"));
+    empGrid.appendChild(detailItem("Email", emp?.email || "—"));
+    empGrid.appendChild(detailItem("Contact No.", emp?.contact_no || "—"));
+    empSection.appendChild(empGrid);
+    body.appendChild(empSection);
+
+    const divider = document.createElement("div");
+    divider.className = "detail-divider";
+    body.appendChild(divider);
+
+    // Leave request info
+    const leaveSection = document.createElement("div");
+    leaveSection.innerHTML = `<div class="detail-section-title">Leave Request</div>`;
+
+    const days = leaveDayCount(leave.date_from, leave.date_to);
+    const leaveGrid = document.createElement("div");
+    leaveGrid.className = "detail-grid";
+    leaveGrid.appendChild(detailItem("Leave Type", leave.leave_type));
+    leaveGrid.appendChild(detailItem("Status", badge(leave.leave_status)));
+    leaveGrid.appendChild(detailItem("From", fmtDate(leave.date_from)));
+    leaveGrid.appendChild(detailItem("To", fmtDate(leave.date_to)));
+    leaveGrid.appendChild(detailItem("Duration", `${days} day${days === 1 ? "" : "s"}`));
+    leaveGrid.appendChild(detailItem("Request ID", `#${leave.leave_id}`));
+    leaveSection.appendChild(leaveGrid);
+
+    const reasonWrap = document.createElement("div");
+    reasonWrap.style.marginTop = "16px";
+    const reasonLabel = document.createElement("div");
+    reasonLabel.className = "detail-item-label";
+    reasonLabel.style.marginBottom = "6px";
+    reasonLabel.textContent = "Reason / Remarks";
+    const reasonBox = document.createElement("div");
+    reasonBox.className = "detail-reason-box";
+    reasonBox.textContent = leave.remarks || "No reason provided.";
+    reasonWrap.appendChild(reasonLabel);
+    reasonWrap.appendChild(reasonBox);
+    leaveSection.appendChild(reasonWrap);
+
+    body.appendChild(leaveSection);
+
+    const footer = document.createElement("div");
+    footer.className = "modal-footer";
+
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "btn btn-outline";
+    closeBtn.textContent = "Close";
+    footer.appendChild(closeBtn);
+
+    if (leave.leave_status === "Pending") {
+      const rejectBtn = document.createElement("button");
+      rejectBtn.className = "btn btn-ghost";
+      rejectBtn.style.color = "var(--red, #ef4444)";
+      rejectBtn.textContent = "Reject";
+      rejectBtn.addEventListener("click", async () => { await updateStatus(leave, "Rejected"); close(); });
+      footer.appendChild(rejectBtn);
+
+      const approveBtn = document.createElement("button");
+      approveBtn.className = "btn btn-primary";
+      approveBtn.innerHTML = `${icons.check} Approve`;
+      approveBtn.addEventListener("click", async () => { await updateStatus(leave, "Approved"); close(); });
+      footer.appendChild(approveBtn);
+    }
+
+    body.appendChild(footer);
+
+    const { close } = openModal({ title: "Leave Request Details", body, wide: true });
+    closeBtn.addEventListener("click", close);
+  }
+
+  function detailItem(label, value) {
+    const div = document.createElement("div");
+    const l = document.createElement("div");
+    l.className = "detail-item-label";
+    l.textContent = label;
+    const v = document.createElement("div");
+    v.className = "detail-item-value";
+    v.innerHTML = value;
+    div.appendChild(l);
+    div.appendChild(v);
+    return div;
+  }
+
+  function leaveDayCount(dateFrom, dateTo) {
+    const from = new Date(dateFrom);
+    const to = new Date(dateTo);
+    const diff = Math.round((to - from) / 86400000) + 1;
+    return diff > 0 ? diff : 1;
   }
 
   // ── File / edit leave modal ──────────────────────────

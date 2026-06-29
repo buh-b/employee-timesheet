@@ -29,6 +29,7 @@ function renderBootScreen() {
 const adminNav = [
   { id: "dashboard",     label: "Dashboard",     icon: icons.dashboard },
   { id: "employees",     label: "Employees",     icon: icons.users     },
+  { id: "departments",   label: "Departments",   icon: icons.briefcase },
   { id: "accounts",      label: "Accounts",      icon: icons.userPlus  },
   { id: "leave_records", label: "Leave Records", icon: icons.fileText  },
   { id: "my_logs",       label: "Time Logs",     icon: logsIcon        },
@@ -82,7 +83,7 @@ async function renderApp() {
 
   const isAdmin = account.access_level === "admin";
 
-  const allowedAdmin    = ["dashboard", "employees", "accounts", "leave_records", "my_logs"];
+  const allowedAdmin    = ["dashboard", "employees", "departments", "accounts", "leave_records", "my_logs"];
   const allowedEmployee = ["dashboard", "time_logs", "my_logs", "leave_records"];
   const allowed = isAdmin ? allowedAdmin : allowedEmployee;
 
@@ -122,6 +123,9 @@ async function renderApp() {
   switch (activeView) {
     case "employees":
       view = isAdmin ? renderEmployees(db, dbChangeHandler) : renderDashboard(db, account);
+      break;
+    case "departments":
+      view = isAdmin ? renderDepartments(db, dbChangeHandler) : renderDashboard(db, account);
       break;
     case "accounts":
       view = isAdmin ? renderAccounts(db, dbChangeHandler) : renderDashboard(db, account);
