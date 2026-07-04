@@ -148,6 +148,33 @@ async function fetchMyPayrollHistory() {
   return apiRequest("/payroll.php?action=my_history");
 }
 
+// ── Reports (admin only) ──────────────────────────────
+function buildReportQS({ departmentId, year, month }) {
+  const params = [];
+  if (departmentId) params.push(`department_id=${departmentId}`);
+  if (year && month) {
+    // Build a full month range so the backend date_from/date_to params are satisfied
+    const pad = (n) => String(n).padStart(2, "0");
+    const lastDay = new Date(year, month, 0).getDate();
+    params.push(`date_from=${year}-${pad(month)}-01`);
+    params.push(`date_to=${year}-${pad(month)}-${lastDay}`);
+  } else if (year) {
+    params.push(`date_from=${year}-01-01`);
+    params.push(`date_to=${year}-12-31`);
+  }
+  return params.length ? `&${params.join("&")}` : "";
+}
+
+async function fetchDepartmentLaborCostReport(filters = {}) {
+  const qs = buildReportQS(filters);
+  return apiRequest(`/reports.php?action=department_labor_cost${qs}`);
+}
+
+async function fetchEmployeeEarningsReport(filters = {}) {
+  const qs = buildReportQS(filters);
+  return apiRequest(`/reports.php?action=employee_earnings${qs}`);
+}
+
 // ── Empty shape ───────────────────────────────────────
 function emptyDb() {
   return {

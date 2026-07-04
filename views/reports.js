@@ -120,15 +120,18 @@ function renderReports(db, onDbChange) {
 
     if (activeTab === "department") {
       const totalCost  = deptRows.reduce((s, r) => s + r.total_labor_cost, 0);
-      const totalHours = deptRows.reduce((s, r) => s + r.total_hours, 0);
+      const totalHours = deptRows.reduce((s, r) => s + r.total_hours_logged, 0);
 
-      const rows = deptRows.map(r => [
-        `<span class="text-xs font-medium">${r.department_name}</span>`,
-        `<span class="text-xs text-gray">${r.department_code}</span>`,
-        `<span class="mono text-xs">${r.employee_count}</span>`,
-        `<span class="mono text-xs">${r.total_hours}h</span>`,
-        `<span class="mono text-xs font-medium">${money(r.total_labor_cost)}</span>`,
-      ]);
+      const rows = deptRows.map(r => {
+        const dept = db.departments.find(d => d.department_id === r.department_id);
+        return [
+          `<span class="text-xs font-medium">${r.department_name}</span>`,
+          `<span class="text-xs text-gray">${dept?.department_code ?? "—"}</span>`,
+          `<span class="mono text-xs">${r.employee_count}</span>`,
+          `<span class="mono text-xs">${Number(r.total_hours_logged).toFixed(2)}h</span>`,
+          `<span class="mono text-xs font-medium">${money(r.total_labor_cost)}</span>`,
+        ];
+      });
 
       tableCard.appendChild(
         buildTable(["Department", "Code", "Employees", "Total Hours", "Total Labor Cost"], rows,
@@ -146,13 +149,13 @@ function renderReports(db, onDbChange) {
       }
     } else {
       const totalEarnings = empRows.reduce((s, r) => s + r.total_earnings, 0);
-      const totalHours    = empRows.reduce((s, r) => s + r.total_hours, 0);
+      const totalHours    = empRows.reduce((s, r) => s + r.total_hours_worked, 0);
 
       const rows = empRows.map(r => [
         `<span class="text-xs font-medium">${r.full_name}</span>`,
         `<span class="text-xs text-gray">${r.department_name || "—"}</span>`,
         `<span class="mono text-xs">₱${Number(r.current_hourly_rate).toFixed(2)}/hr</span>`,
-        `<span class="mono text-xs">${r.total_hours}h</span>`,
+        `<span class="mono text-xs">${Number(r.total_hours_worked).toFixed(2)}h</span>`,
         `<span class="mono text-xs font-medium">${money(r.total_earnings)}</span>`,
       ]);
 

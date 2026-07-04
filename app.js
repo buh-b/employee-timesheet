@@ -35,6 +35,7 @@ const adminNav = [
   { id: "my_logs",          label: "Time Logs",         icon: logsIcon        },
   { id: "payroll",          label: "Payroll",           icon: payIcon         },
   { id: "shift_categories", label: "Shift Categories",  icon: shiftIcon       },
+  { id: "reports",          label: "Reports",            icon: icons.barChart  },
 ];
 
 // Employee nav — includes My Pay History
@@ -87,7 +88,7 @@ async function renderApp() {
   const isAdmin = account.access_level === "admin";
 
   const allowedAdmin    = ["dashboard", "employees", "departments", "accounts",
-                           "leave_records", "my_logs", "payroll", "shift_categories"];
+                           "leave_records", "my_logs", "payroll", "shift_categories", "reports"];
   const allowedEmployee = ["dashboard", "time_logs", "my_logs", "leave_records", "payroll"];
   const allowed = isAdmin ? allowedAdmin : allowedEmployee;
 
@@ -149,6 +150,9 @@ async function renderApp() {
       break;
     case "shift_categories":
       view = isAdmin ? renderShiftCategories(db, dbChangeHandler) : renderDashboard(db, account);
+      break;
+    case "reports":
+      view = isAdmin ? renderReports(db, dbChangeHandler) : renderDashboard(db, account);
       break;
     default:
       view = renderDashboard(db, account);
