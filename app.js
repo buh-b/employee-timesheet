@@ -9,6 +9,7 @@ const root = document.getElementById("app");
 
 // ── Icons ─────────────────────────────────────────────
 const clockIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+const liveIcon  = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>`;
 const logsIcon  = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
 const payIcon   = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>`;
 const shiftIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/><line x1="2" y1="2" x2="22" y2="22" stroke-width="1.5"/></svg>`;
@@ -32,6 +33,7 @@ const adminNav = [
   { id: "departments",      label: "Departments",       icon: icons.briefcase },
   { id: "accounts",         label: "Accounts",          icon: icons.userPlus  },
   { id: "leave_records",    label: "Leave Records",     icon: icons.fileText  },
+  { id: "clocked_in_now",   label: "Clocked In Now",    icon: liveIcon        },
   { id: "my_logs",          label: "Time Logs",         icon: logsIcon        },
   { id: "payroll",          label: "Payroll",           icon: payIcon         },
   { id: "shift_categories", label: "Shift Categories",  icon: shiftIcon       },
@@ -88,7 +90,7 @@ async function renderApp() {
   const isAdmin = account.access_level === "admin";
 
   const allowedAdmin    = ["dashboard", "employees", "departments", "accounts",
-                           "leave_records", "my_logs", "payroll", "shift_categories", "reports"];
+                           "leave_records", "clocked_in_now", "my_logs", "payroll", "shift_categories", "reports"];
   const allowedEmployee = ["dashboard", "time_logs", "my_logs", "leave_records", "payroll"];
   const allowed = isAdmin ? allowedAdmin : allowedEmployee;
 
@@ -137,6 +139,9 @@ async function renderApp() {
       break;
     case "leave_records":
       view = renderLeaveRecords(db, account, dbChangeHandler);
+      break;
+    case "clocked_in_now":
+      view = isAdmin ? renderClockedInNow(db, account, dbChangeHandler) : renderDashboard(db, account);
       break;
     case "time_logs":
       view = renderTimeLogs(db, account, dbChangeHandler);

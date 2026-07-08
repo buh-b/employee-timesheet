@@ -12,6 +12,10 @@ function renderMyLogs(db, account, onDbChange) {
   return renderLogsView(db, account, onDbChange);
 }
 
+function renderClockedInNow(db, account, onDbChange) {
+  return renderClockedInNowView(db, account, onDbChange);
+}
+
 // ═════════════════════════════════════════════════════
 // CLOCK IN / OUT VIEW
 // ═════════════════════════════════════════════════════
@@ -279,6 +283,154 @@ function renderClockInOut(db, account, onDbChange) {
 }
 
 // ═════════════════════════════════════════════════════
+// CURRENTLY CLOCKED IN (admin only, today's active clock-ins)
+// ═════════════════════════════════════════════════════
+function renderClockedInNowView(db, account, onDbChange) {
+  const page = document.createElement("div");
+  page.className = "page";
+
+  page.appendChild(pageHeader("Currently Clocked In", "Employees who are clocked in right now, today"));
+
+  // Use local date (not UTC) so it matches the server-stored PH date.
+  const _now = new Date();
+  const today = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,"0")}-${String(_now.getDate()).padStart(2,"0")}`;
+
+  // Active = clocked in today and not yet clocked out. Restricting to
+  // clock_in.startsWith(today) keeps stale/forgotten open logs from prior
+  // days out of this "right now" view.
+  const activeNow = db.timeLogs.filter(l => l.clock_in.startsWith(today) && !l.clock_out);
+
+  // ── Filter bar: department + search ───────────────────
+  const filterBar = document.createElement("div");
+  filterBar.style.cssText = "display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center";
+
+  const deptOptions = [["all", "All Departments"], ...db.departments.map(d => [String(d.department_id), d.department_name])];
+  const deptSel = makeSelect(deptOptions, "all");
+  deptSel.style.width = "200px";
+  filterBar.appendChild(deptSel);
+
+  const searchWrap = document.createElement("div");
+  searchWrap.style.cssText = "position:relative;flex:1;min-width:200px;max-width:320px";
+  const searchInp = makeInput("text", "", "Search by name…");
+  searchInp.style.width = "100%";
+  searchInp.style.paddingLeft = "34px";
+  const searchIcon = document.createElement("span");
+  searchIcon.style.cssText = "position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-muted);display:flex";
+  searchIcon.innerHTML = icons.search;
+  searchWrap.appendChild(searchIcon);
+  searchWrap.appendChild(searchInp);
+  filterBar.appendChild(searchWrap);
+
+  page.appendChild(filterBar);
+
+  const statsStrip = document.createElement("div");
+  statsStrip.style.cssText = "display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap";
+  page.appendChild(statsStrip);
+
+  const card = document.createElement("div");
+  card.className = "card";
+  page.appendChild(card);
+
+  let refreshTimer = null;
+
+  function employeeDept(employeeId) {
+    const emp = db.employees.find(e => e.employee_id === employeeId);
+    return emp ? emp.department_name || "—" : "—";
+  }
+
+  function renderList() {
+    card.innerHTML = "";
+    statsStrip.innerHTML = "";
+
+    const deptVal = deptSel.value;
+    const search  = searchInp.value.trim().toLowerCase();
+
+    const filtered = activeNow.filter(l => {
+      if (deptVal !== "all") {
+        const emp = db.employees.find(e => e.employee_id === l.employee_id);
+        if (!emp || String(emp.department_id) !== deptVal) return false;
+      }
+      if (search && !(l.full_name || "").toLowerCase().includes(search)) return false;
+      return true;
+    });
+
+    const lateCount = filtered.filter(l => l.status_label === "Late").length;
+    const onTimeCount = filtered.length - lateCount;
+
+    const stats = [
+      { label: "Clocked In Now", value: filtered.length, color: "#0ea5e9" },
+      { label: "On Time",        value: onTimeCount,     color: "#22c55e" },
+      { label: "Late",           value: lateCount,        color: "#f97316" },
+    ];
+    stats.forEach(s => {
+      const pill = document.createElement("div");
+      pill.style.cssText = "background:#fff;border:1px solid var(--border,#e5e7eb);border-radius:10px;padding:10px 18px;display:flex;align-items:center;gap:10px";
+      pill.innerHTML = `
+        <span style="font-size:1.3rem;font-weight:800;color:${s.color}">${s.value}</span>
+        <span style="font-size:0.75rem;color:var(--text-muted);font-weight:500">${s.label}</span>
+      `;
+      statsStrip.appendChild(pill);
+    });
+
+    if (!filtered.length) {
+      card.innerHTML = `
+        <div style="text-align:center;padding:48px 0;color:var(--text-muted)">
+          <div style="font-size:2rem;margin-bottom:8px">🕒</div>
+          <div style="font-size:0.9rem">No one is currently clocked in.</div>
+        </div>`;
+      return;
+    }
+
+    const headers = ["Employee", "Department", "Shift", "Clock In", "Duration", "Status"];
+    const rows = filtered.map(l => {
+      const empCell = document.createElement("div");
+      empCell.className = "emp-cell";
+      empCell.innerHTML = `${avatarHTML(l.full_name || "?", "sm")}<span style="margin-left:6px;font-size:0.85rem">${l.full_name || "?"}</span>`;
+
+      const durationCell = document.createElement("span");
+      durationCell.dataset.clockIn = l.clock_in;
+      durationCell.style.fontVariantNumeric = "tabular-nums";
+
+      return [
+        empCell,
+        employeeDept(l.employee_id),
+        `<span style="font-size:0.78rem">${l.category_name || "—"}</span>`,
+        fmtTime(l.clock_in),
+        durationCell,
+        l.status_label ? badge(l.status_label) : "—",
+      ];
+    });
+
+    card.appendChild(buildTable(headers, rows, "No one is currently clocked in."));
+
+    function tickDurations() {
+      card.querySelectorAll("span[data-clock-in]").forEach(el => {
+        const diff = Math.floor((Date.now() - new Date(el.dataset.clockIn).getTime()) / 1000);
+        const h = Math.floor(diff / 3600);
+        const m = Math.floor((diff % 3600) / 60);
+        const s = diff % 60;
+        el.textContent = `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+      });
+    }
+    tickDurations();
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(tickDurations, 1000);
+  }
+
+  deptSel.addEventListener("change", renderList);
+  searchInp.addEventListener("input", renderList);
+
+  renderList();
+
+  const obs = new MutationObserver(() => {
+    if (!document.body.contains(page)) { clearInterval(refreshTimer); obs.disconnect(); }
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
+
+  return page;
+}
+
+// ═════════════════════════════════════════════════════
 // MY LOGS / ALL LOGS VIEW
 // ═════════════════════════════════════════════════════
 function renderLogsView(db, account, onDbChange) {
@@ -297,56 +449,69 @@ function renderLogsView(db, account, onDbChange) {
   const filterBar = document.createElement("div");
   filterBar.style.cssText = "display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center";
 
-  // Period tabs
-  const periods = ["Day", "Week", "Month", "Year", "All"];
-  let activePeriod = "Week";
+  const baseSource = isAdmin
+    ? db.timeLogs
+    : db.timeLogs.filter(l => l.employee_id === empId);
 
-  const tabsWrap = document.createElement("div");
-  tabsWrap.style.cssText = "display:flex;gap:4px;background:var(--gray-100,#f3f4f6);border-radius:8px;padding:3px";
+  // Year options — derived from the logs in scope, newest first, plus "All".
+  const nowForYear = new Date();
+  const yearsInData = Array.from(new Set(baseSource.map(l => new Date(l.clock_in).getFullYear())));
+  if (!yearsInData.includes(nowForYear.getFullYear())) yearsInData.push(nowForYear.getFullYear());
+  yearsInData.sort((a, b) => b - a);
 
-  function filterByPeriod(logs) {
-    const now = new Date();
-    if (activePeriod === "All") return logs;
+  const yearOptions = [["all", "All Years"], ...yearsInData.map(y => [String(y), String(y)])];
+  let selectedYear = String(nowForYear.getFullYear());
+  const yearSel = makeSelect(yearOptions, selectedYear);
+  yearSel.style.width = "130px";
+  filterBar.appendChild(yearSel);
+
+  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const monthOptions = [["all", "All Months"], ...monthNames.map((m, i) => [String(i + 1), m])];
+  let selectedMonth = "all";
+  const monthSel = makeSelect(monthOptions, selectedMonth);
+  monthSel.style.width = "150px";
+  filterBar.appendChild(monthSel);
+
+  let selectedDept = "all";
+  let searchTerm = "";
+
+  if (isAdmin) {
+    const deptOptions = [["all", "All Departments"], ...db.departments.map(d => [String(d.department_id), d.department_name])];
+    const deptSel = makeSelect(deptOptions, selectedDept);
+    deptSel.style.width = "200px";
+    deptSel.addEventListener("change", () => { selectedDept = deptSel.value; renderLogsTable(); });
+    filterBar.appendChild(deptSel);
+
+    const searchWrap = document.createElement("div");
+    searchWrap.style.cssText = "position:relative;flex:1;min-width:200px;max-width:280px";
+    const searchInp = makeInput("text", "", "Search by name…");
+    searchInp.style.width = "100%";
+    searchInp.style.paddingLeft = "34px";
+    const searchIcon = document.createElement("span");
+    searchIcon.style.cssText = "position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-muted);display:flex";
+    searchIcon.innerHTML = icons.search;
+    searchWrap.appendChild(searchIcon);
+    searchWrap.appendChild(searchInp);
+    searchInp.addEventListener("input", () => { searchTerm = searchInp.value.trim().toLowerCase(); renderLogsTable(); });
+    filterBar.appendChild(searchWrap);
+  }
+
+  yearSel.addEventListener("change", () => { selectedYear = yearSel.value; renderLogsTable(); });
+  monthSel.addEventListener("change", () => { selectedMonth = monthSel.value; renderLogsTable(); });
+
+  function applyFilters(logs) {
     return logs.filter(l => {
       const d = new Date(l.clock_in);
-      if (activePeriod === "Day") {
-        return d.toDateString() === now.toDateString();
-      } else if (activePeriod === "Week") {
-        const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - now.getDay());
-        weekStart.setHours(0,0,0,0);
-        return d >= weekStart;
-      } else if (activePeriod === "Month") {
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      } else if (activePeriod === "Year") {
-        return d.getFullYear() === now.getFullYear();
+      if (selectedYear !== "all" && d.getFullYear() !== Number(selectedYear)) return false;
+      if (selectedMonth !== "all" && (d.getMonth() + 1) !== Number(selectedMonth)) return false;
+      if (isAdmin && selectedDept !== "all") {
+        const emp = db.employees.find(e => e.employee_id === l.employee_id);
+        if (!emp || String(emp.department_id) !== selectedDept) return false;
       }
+      if (isAdmin && searchTerm && !(l.full_name || "").toLowerCase().includes(searchTerm)) return false;
       return true;
     });
   }
-
-  const tabBtns = {};
-  periods.forEach(p => {
-    const btn = document.createElement("button");
-    btn.textContent = p;
-    btn.style.cssText = "padding:5px 14px;border:none;border-radius:6px;font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.15s";
-    btn.onclick = () => {
-      activePeriod = p;
-      periods.forEach(pp => {
-        tabBtns[pp].style.background = pp === p ? "#fff" : "transparent";
-        tabBtns[pp].style.color = pp === p ? "var(--text-primary)" : "var(--text-muted)";
-        tabBtns[pp].style.boxShadow = pp === p ? "0 1px 3px rgba(0,0,0,0.1)" : "none";
-      });
-      renderLogsTable();
-    };
-    btn.style.background = p === activePeriod ? "#fff" : "transparent";
-    btn.style.color = p === activePeriod ? "var(--text-primary)" : "var(--text-muted)";
-    btn.style.boxShadow = p === activePeriod ? "0 1px 3px rgba(0,0,0,0.1)" : "none";
-    tabBtns[p] = btn;
-    tabsWrap.appendChild(btn);
-  });
-
-  filterBar.appendChild(tabsWrap);
 
   // Summary stats strip
   const statsStrip = document.createElement("div");
@@ -363,11 +528,7 @@ function renderLogsView(db, account, onDbChange) {
     card.innerHTML = "";
     statsStrip.innerHTML = "";
 
-    const source = isAdmin
-      ? db.timeLogs
-      : db.timeLogs.filter(l => l.employee_id === empId);
-
-    const filtered = filterByPeriod(source);
+    const filtered = applyFilters(baseSource);
 
     // Compute summary stats
     const totalHours = filtered.reduce((s, l) => s + (l.total_hours ? Number(l.total_hours) : 0), 0);
