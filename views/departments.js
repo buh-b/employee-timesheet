@@ -1,9 +1,4 @@
 // ── Departments view (admin only) ─────────────────────
-// TSK-33: Department & Labor Cost Page — table showing each department's
-//         name, employee headcount, and TOTAL SALARY (sum of all employees'
-//         net pay from the most recent approved payroll period).
-//         Admin can add and edit departments.
-
 function renderDepartments(db, onDbChange) {
   const page = document.createElement("div");
   page.className = "page";
@@ -141,7 +136,7 @@ function renderDepartments(db, onDbChange) {
       ${hasSalaryData ? `
       <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 18px;display:flex;align-items:center;gap:10px">
         <span style="font-size:1.2rem;font-weight:800;color:#16a34a">₱${totalSalary.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
-        <span style="font-size:0.75rem;color:var(--text-muted);font-weight:500">Total Salary Paid (Latest Periods)</span>
+        <span style="font-size:0.75rem;color:var(--text-muted);font-weight:500">Labor Cost Allocation</span>
       </div>` : `
       <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;padding:10px 18px;display:flex;align-items:center;gap:10px">
         <span style="font-size:0.78rem;color:var(--text-muted)">No approved payroll yet — generate payroll to see totals</span>
@@ -182,7 +177,7 @@ function renderDepartments(db, onDbChange) {
     });
 
     const table = buildTable(
-      ["Department", "Code", "Headcount", "Total Salary (Latest Payroll)", ""],
+      ["Department", "Code", "Headcount", "Labor Cost Allocation", ""],
       rows,
       "No departments found."
     );
