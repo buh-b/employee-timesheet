@@ -53,6 +53,7 @@ const navSystemAdmin = [
   { id: "work_schedules",    label: "Work Schedules",    icon: shiftIcon        },
   { id: "employment_types",  label: "Employment Types",  icon: icons.briefcase  },
   { id: "holidays",          label: "Holidays",          icon: icons.fileText   },
+  { id: "overtime_categories", label: "Overtime Categories", icon: shiftIcon    },
   { id: "reports",           label: "Reports",           icon: icons.barChart   },
   { id: "audit_log",         label: "Audit Log",         icon: icons.history    },
 ];
@@ -225,6 +226,9 @@ async function renderApp() {
       break;
     case "holidays":
       view = isAdminConfigLevel ? renderHolidays(db, dbChangeHandler) : renderDashboard(db, account);
+      break;
+    case "overtime_categories":
+      view = isAdminConfigLevel ? renderOvertimeCategories(db, dbChangeHandler) : renderDashboard(db, account);
       break;
     case "reports":
       view = isAdminConfigLevel ? renderReports(db, dbChangeHandler) : renderDashboard(db, account);

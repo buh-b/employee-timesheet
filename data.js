@@ -37,7 +37,7 @@ async function logoutRequest() {
 async function fetchAllData() {
   const safe = (p) => p.catch(() => []);
 
-  const [employees, departments, roles, shiftCategories, attendanceStatuses, leaveRecords, accounts, timeLogs, dashboardStats, leaveTypes, employmentStatuses, workSchedules, employmentTypes, holidays] =
+  const [employees, departments, roles, shiftCategories, attendanceStatuses, leaveRecords, accounts, timeLogs, dashboardStats, leaveTypes, employmentStatuses, workSchedules, employmentTypes, holidays, overtimeCategories] =
     await Promise.all([
       apiRequest("/employees.php"),
       apiRequest("/departments.php"),
@@ -53,6 +53,7 @@ async function fetchAllData() {
       safe(apiRequest("/work_schedules.php")),
       safe(apiRequest("/employment_types.php")),
       safe(apiRequest("/holidays.php")),
+      safe(apiRequest("/overtime_categories.php")),
     ]);
 
   return {
@@ -70,6 +71,7 @@ async function fetchAllData() {
     workSchedules,
     employmentTypes,
     holidays,
+    overtimeCategories,
   };
 }
 
@@ -229,5 +231,6 @@ function emptyDb() {
     workSchedules: [],
     employmentTypes: [],
     holidays: [],
+    overtimeCategories: [],
   };
 }
