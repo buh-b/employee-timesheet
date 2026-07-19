@@ -27,7 +27,8 @@ const SYSTEM_ADMIN_NAV = [
     label: "Overview",
     items: [
       { id: "dashboard", label: "Dashboard", icon: icons.dashboard },
-      { id: "reports",   label: "Reports",   icon: icons.barChart  },
+      { id: "reports",   label: "Departments", icon: icons.barChart  },
+
     ],
   },
   {
