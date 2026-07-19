@@ -6,8 +6,7 @@ function renderDepartments(db, account, onDbChange) {
 
   const canManage = account && account.access_level === "system_admin";
 
-  let searchVal   = "";
-  let deptSalaries = {};
+  let searchVal = "";
 
   function refresh() {
     page.innerHTML = "";
@@ -20,44 +19,6 @@ function renderDepartments(db, account, onDbChange) {
       onDbChange(db);
     } catch (err) {
       showToast(err.message || "Could not reload departments.", "error");
-    }
-  }
-
-  // loaddept
-  async function loadDeptSalaries() {
-    try {
-      
-      const periods = await fetchPayrollPeriods(null);
-      const approved = periods.filter(p => p.status === "Approved");
-
-      const latestPerDept = {};
-      approved.forEach(p => {
-        const key = p.department_id;
-        if (!latestPerDept[key] ||
-            p.period_year > latestPerDept[key].period_year ||
-            (p.period_year === latestPerDept[key].period_year &&
-             p.period_month > latestPerDept[key].period_month)) {
-          latestPerDept[key] = p;
-        }
-      });
-
-      const fetches = Object.values(latestPerDept).map(async p => {
-        try {
-          const data = await fetchPayrollRecords(p.period_id);
-          const total = data.records.reduce((s, r) => s + Number(r.net_pay), 0);
-          return { department_id: p.department_id, total, period: p };
-        } catch {
-          return { department_id: p.department_id, total: 0, period: p };
-        }
-      });
-
-      const results = await Promise.all(fetches);
-      deptSalaries = {};
-      results.forEach(r => {
-        deptSalaries[r.department_id] = { total: r.total, period: r.period };
-      });
-    } catch {
-      deptSalaries = {};
     }
   }
 
@@ -79,11 +40,6 @@ function renderDepartments(db, account, onDbChange) {
     const card = document.createElement("div");
     card.className = "card";
 
-    const loadingEl = document.createElement("div");
-    loadingEl.style.cssText = "padding:12px 0;font-size:0.82rem;color:var(--text-muted);display:flex;align-items:center;gap:8px";
-    loadingEl.innerHTML = `<span style="display:inline-block;width:14px;height:14px;border:2px solid #e5e7eb;border-top-color:#6366f1;border-radius:50%;animation:spin 0.7s linear infinite"></span> Loading salary totals…`;
-    card.appendChild(loadingEl);
-
     // Search bar
     const searchBar = document.createElement("div");
     searchBar.className = "search-bar";
@@ -100,11 +56,7 @@ function renderDepartments(db, account, onDbChange) {
     card.appendChild(searchBar);
 
     page.appendChild(card);
-
-    loadDeptSalaries().then(() => {
-      loadingEl.remove();
-      renderTable(card);
-    });
+    renderTable(card);
   }
 
   async function renderTable(card) {
@@ -116,12 +68,7 @@ function renderDepartments(db, account, onDbChange) {
     const filtered = await apiRequest(`/departments.php?${deptParams.toString()}`);
 
     // Summary strip
-    const totalEmployees  = filtered.reduce((s, d) => s + (d.employee_count || 0), 0);
-    const totalSalary     = filtered.reduce((s, d) => {
-      const sal = deptSalaries[d.department_id];
-      return s + (sal ? sal.total : 0);
-    }, 0);
-    const hasSalaryData   = Object.keys(deptSalaries).length > 0;
+    const totalEmployees = filtered.reduce((s, d) => s + (d.employee_count || 0), 0);
 
     const oldStrip = card.querySelector(".dept-summary-strip");
     if (oldStrip) oldStrip.remove();
@@ -134,35 +81,10 @@ function renderDepartments(db, account, onDbChange) {
         <span style="font-size:1.2rem;font-weight:800;color:#6366f1">${totalEmployees}</span>
         <span style="font-size:0.75rem;color:var(--text-muted);font-weight:500">Total Employees</span>
       </div>
-      ${hasSalaryData ? `
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:10px 18px;display:flex;align-items:center;gap:10px">
-        <span style="font-size:1.2rem;font-weight:800;color:#16a34a">₱${totalSalary.toLocaleString("en-PH", { minimumFractionDigits: 2 })}</span>
-        <span style="font-size:0.75rem;color:var(--text-muted);font-weight:500">Labor Cost Allocation</span>
-      </div>` : `
-      <div style="background:#fafafa;border:1px solid #e5e7eb;border-radius:10px;padding:10px 18px;display:flex;align-items:center;gap:10px">
-        <span style="font-size:0.78rem;color:var(--text-muted)">No approved payroll yet — generate payroll to see totals</span>
-      </div>`}
     `;
     card.insertBefore(strip, card.querySelector(".table-wrap") || null);
 
-    const fmt = n => "₱" + Number(n).toLocaleString("en-PH", { minimumFractionDigits: 2 });
-
     const rows = filtered.map(d => {
-      const salData = deptSalaries[d.department_id];
-      const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
-      let salaryCell;
-      if (salData) {
-        const periodLabel = `${monthNames[salData.period.period_month - 1]} ${salData.period.period_year}`;
-        salaryCell = `
-          <div>
-            <span class="mono text-xs font-medium" style="color:#16a34a">${fmt(salData.total)}</span>
-            <div style="font-size:0.7rem;color:var(--text-muted);margin-top:2px">${periodLabel}</div>
-          </div>`;
-      } else {
-        salaryCell = `<span class="text-xs text-gray">—</span>`;
-      }
-
       let actionsCell = `<span class="text-xs text-gray">—</span>`;
       if (canManage) {
         const editBtn = document.createElement("button");
@@ -177,13 +99,12 @@ function renderDepartments(db, account, onDbChange) {
         `<span class="mono text-xs">${d.department_code || "—"}</span>`,
         `<span class="text-sm">${d.supervisor_name || "—"}</span>`,
         `<span class="text-sm">${d.employee_count || 0}</span>`,
-        salaryCell,
         actionsCell,
       ];
     });
 
     const table = buildTable(
-      ["Department", "Code", "Supervisor", "Headcount", "Labor Cost Allocation", ""],
+      ["Department", "Code", "Supervisor", "Headcount", ""],
       rows,
       "No departments found."
     );
@@ -198,7 +119,6 @@ function renderDepartments(db, account, onDbChange) {
     const data = isEdit ? { ...existing } : {
       department_name: "",
       department_code: "",
-      labor_cost_allocation: 0,
       supervisor_id: null,
     };
 
@@ -207,9 +127,8 @@ function renderDepartments(db, account, onDbChange) {
     body.style.flexDirection = "column";
     body.style.gap = "14px";
 
-    const fName   = makeInput("text",   data.department_name,       "e.g. Human Resources");
-    const fCode   = makeInput("text",   data.department_code,       "e.g. HR");
-    const fBudget = makeInput("number", data.labor_cost_allocation);
+    const fName = makeInput("text", data.department_name, "e.g. Human Resources");
+    const fCode = makeInput("text", data.department_code, "e.g. HR");
 
     const supervisorOpts = [
       ["", "No Supervisor"],
@@ -220,12 +139,6 @@ function renderDepartments(db, account, onDbChange) {
     body.appendChild(buildField("Department Name", fName));
     body.appendChild(buildField("Department Code", fCode));
     body.appendChild(buildField("Supervisor", fSupervisor));
-    body.appendChild(buildField("Labor Cost Budget (₱)", fBudget));
-
-    const hint = document.createElement("div");
-    hint.style.cssText = "font-size:0.78rem;color:var(--text-muted);margin-top:-8px";
-    hint.textContent = "The budget field is for planning. Actual salary totals are computed from approved payroll records.";
-    body.appendChild(hint);
 
     const errEl = document.createElement("div");
     errEl.className = "alert-error";
@@ -255,19 +168,17 @@ function renderDepartments(db, account, onDbChange) {
     cancelBtn.addEventListener("click", close);
 
     saveBtn.addEventListener("click", async () => {
-      const name   = fName.value.trim();
-      const code   = fCode.value.trim();
-      const budget = Number(fBudget.value) || 0;
+      const name = fName.value.trim();
+      const code = fCode.value.trim();
       const supervisorId = fSupervisor.value ? Number(fSupervisor.value) : null;
 
       if (!name) { errEl.textContent = "Department name is required."; errEl.style.display = "block"; return; }
       if (!code) { errEl.textContent = "Department code is required."; errEl.style.display = "block"; return; }
 
       const payload = {
-        department_name:       name,
-        department_code:       code.toUpperCase(),
-        labor_cost_allocation: budget,
-        supervisor_id:         supervisorId,
+        department_name: name,
+        department_code: code.toUpperCase(),
+        supervisor_id: supervisorId,
       };
       if (isEdit) payload.department_id = data.department_id;
 
