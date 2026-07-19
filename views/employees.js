@@ -206,6 +206,9 @@ function renderEmployees(db, account, onDbChange) {
     const fContact = makeInput("text", data.contact_no, "+63 9XX XXX XXXX");
     const fHire    = makeInput("date", data.hire_date);
 
+const fRate    = makeInput("number", data.hourly_rate ?? 0, "0.00");
+    fRate.step = "0.01"; fRate.min = "0";
+
     const deptOpts   = db.departments.map(d => [d.department_id, d.department_name]);
     const roleOpts   = db.roles.map(r => [r.role_id, r.role_name]);
     const statusOpts = (db.employmentStatuses || []).map(s => [s.employment_status_id, s.status_name]);
@@ -223,6 +226,7 @@ function renderEmployees(db, account, onDbChange) {
     formGrid.appendChild(buildField("Email", fEmail));
     formGrid.appendChild(buildField("Contact No", fContact));
     formGrid.appendChild(buildField("Hire Date", fHire));
+    formGrid.appendChild(buildField("Hourly Rate (₱)", fRate));
     formGrid.appendChild(buildField("Department", fDept));
     formGrid.appendChild(buildField("Role", fRole));
     formGrid.appendChild(buildField("Employment Status", fStatus));
@@ -301,6 +305,7 @@ function renderEmployees(db, account, onDbChange) {
         email,
         contact_no:           fContact.value.trim(),
         hire_date:            fHire.value,
+   hourly_rate:           Number(fRate.value) || 0,
         employment_status_id: Number(fStatus.value) || null,
         employment_type_id:   Number(fType.value) || null,
         schedule_id:          Number(fSched.value) || null,
