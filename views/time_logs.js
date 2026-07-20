@@ -17,7 +17,7 @@ function renderClockInOut(db, account, onDbChange) {
   const page = document.createElement("div");
   page.className = "page";
 
-  if (isPureAdmin(account)) {
+  if (isSystemAdmin(account)) {
     page.appendChild(pageHeader("Time Logs", "Admin accounts do not clock in"));
     const info = document.createElement("div");
     info.className = "card";

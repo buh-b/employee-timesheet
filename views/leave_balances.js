@@ -47,6 +47,12 @@ function renderLeaveBalances(db, account, onDbChange) {
       rolloverBtn.addEventListener("click", () => openRolloverModal());
       headerActions.appendChild(rolloverBtn);
 
+      const resetBtn = document.createElement("button");
+      resetBtn.className = "btn btn-outline";
+      resetBtn.innerHTML = `${icons.history || ""} Full Reset (No Carryover)`;
+      resetBtn.addEventListener("click", () => openResetModal());
+      headerActions.appendChild(resetBtn);
+
       const addBtn = document.createElement("button");
       addBtn.className = "btn btn-primary";
       addBtn.innerHTML = `${icons.plus} Grant Leave Balance`;
@@ -272,6 +278,69 @@ function renderLeaveBalances(db, account, onDbChange) {
         await reloadBalances();
       } catch (err) {
         errEl.textContent = err.message || "Could not run rollover.";
+        errEl.style.display = "block";
+      } finally {
+        runBtn.disabled = false;
+      }
+    });
+  }
+
+  function openResetModal() {
+    const thisYear = new Date().getFullYear();
+    const body = document.createElement("div");
+    body.style.cssText = "display:flex;flex-direction:column;gap:14px";
+
+    const note = document.createElement("p");
+    note.className = "text-sm text-gray";
+    note.textContent = "Creates a fresh balance row for every active employee, for every leave type, for the year below. Entitled days reset to each leave type's default with no carryover — used and carried-over days both start at 0. Employees/types that already have a balance for this year are skipped.";
+    body.appendChild(note);
+
+    const fYear = makeInput("number", thisYear);
+    body.appendChild(buildField("Year", fYear));
+
+    const errEl = document.createElement("div");
+    errEl.className = "alert-error";
+    errEl.style.display = "none";
+    body.appendChild(errEl);
+
+    const footer = document.createElement("div");
+    footer.className = "modal-footer";
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "btn btn-outline";
+    cancelBtn.textContent = "Cancel";
+    const runBtn = document.createElement("button");
+    runBtn.className = "btn btn-primary";
+    runBtn.innerHTML = `${icons.check} Run Full Reset`;
+    footer.appendChild(cancelBtn);
+    footer.appendChild(runBtn);
+    body.appendChild(footer);
+
+    const { close } = openModal({ title: "Full Reset Leave Balances", body });
+    cancelBtn.addEventListener("click", close);
+
+    runBtn.addEventListener("click", async () => {
+      const year = Number(fYear.value);
+
+      if (!year) {
+        errEl.textContent = "Year is required.";
+        errEl.style.display = "block";
+        return;
+      }
+
+      errEl.style.display = "none";
+      runBtn.disabled = true;
+
+      try {
+        const result = await apiRequest("/leave_balances.php?action=reset", {
+          method: "POST",
+          body: JSON.stringify({ year }),
+        });
+        close();
+        showToast(result.message || "Reset complete.", "success");
+        filterYear = year;
+        await reloadBalances();
+      } catch (err) {
+        errEl.textContent = err.message || "Could not run full reset.";
         errEl.style.display = "block";
       } finally {
         runBtn.disabled = false;
