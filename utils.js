@@ -45,6 +45,90 @@ function showToast(msg, type = "default") {
   setTimeout(() => t.remove(), 3000);
 }
 
+// ── Password strength ─────────────────────────────────
+// Returns { score (0-4), label, className } for a given password.
+// score: 0 = empty/very weak ... 4 = strong
+function scorePasswordStrength(pw) {
+  pw = pw || "";
+
+  if (!pw) return { score: 0, label: "", className: "" };
+
+  const hasLower   = /[a-z]/.test(pw);
+  const hasUpper   = /[A-Z]/.test(pw);
+  const hasDigit   = /[0-9]/.test(pw);
+  const hasSpecial = /[^A-Za-z0-9]/.test(pw);
+  const variety     = [hasLower, hasUpper, hasDigit, hasSpecial].filter(Boolean).length;
+
+  let score = 0;
+  if (pw.length >= 6)  score++;
+  if (pw.length >= 10) score++;
+  if (variety >= 3)    score++;
+  if (variety >= 4 && pw.length >= 12) score++;
+
+  // Penalize very common/weak patterns regardless of the above
+  const common = ["password", "123456", "qwerty", "letmein", "111111", "12345678"];
+  if (common.some(c => pw.toLowerCase().includes(c))) score = Math.min(score, 1);
+
+  const levels = [
+    { label: "Very weak", className: "very-weak" },
+    { label: "Weak",      className: "weak" },
+    { label: "Fair",      className: "fair" },
+    { label: "Good",      className: "good" },
+    { label: "Strong",    className: "strong" },
+  ];
+
+  return { score, ...levels[score] };
+}
+
+// A password is considered "strong enough to accept" when it has
+// decent length AND a healthy mix of character types.
+function isPasswordStrongEnough(pw) {
+  pw = pw || "";
+  const hasLower   = /[a-z]/.test(pw);
+  const hasUpper   = /[A-Z]/.test(pw);
+  const hasDigit   = /[0-9]/.test(pw);
+  const hasSpecial = /[^A-Za-z0-9]/.test(pw);
+  const variety = [hasLower, hasUpper, hasDigit, hasSpecial].filter(Boolean).length;
+  return pw.length >= 8 && variety >= 3;
+}
+
+// Builds a live-updating strength meter element. Call .update(pw) on the
+// returned object whenever the password input changes.
+function buildPasswordStrengthMeter() {
+  const wrap = document.createElement("div");
+  wrap.className = "pw-strength";
+  wrap.style.display = "none";
+
+  const bar = document.createElement("div");
+  bar.className = "pw-strength-bar";
+  for (let i = 0; i < 4; i++) {
+    const seg = document.createElement("div");
+    seg.className = "pw-strength-seg";
+    bar.appendChild(seg);
+  }
+
+  const label = document.createElement("div");
+  label.className = "pw-strength-label";
+
+  wrap.appendChild(bar);
+  wrap.appendChild(label);
+
+  function update(pw) {
+    const { score, label: text, className } = scorePasswordStrength(pw);
+    wrap.style.display = pw ? "flex" : "none";
+
+    const segs = bar.querySelectorAll(".pw-strength-seg");
+    segs.forEach((seg, i) => {
+      seg.className = "pw-strength-seg" + (i < score ? ` filled ${className}` : "");
+    });
+
+    label.textContent = text;
+    label.className = `pw-strength-label ${className}`;
+  }
+
+  return { el: wrap, update };
+}
+
 // ── SVG icon helpers ─────────────────────────────────
 const icons = {
   timer: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
