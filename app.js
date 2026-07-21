@@ -270,11 +270,17 @@ function openChangePasswordModal() {
   body.style.cssText = "display:flex;flex-direction:column;gap:14px";
 
   const fCurrent = makeInput("password", "", "Enter current password");
-  const fNew     = makeInput("password", "", "At least 6 characters");
+  const fNew     = makeInput("password", "", "At least 8 characters, mixed case, number & symbol");
   const fConfirm = makeInput("password", "", "Re-enter new password");
 
+  const newField = buildField("New Password", fNew);
+  const strengthMeter = buildPasswordStrengthMeter();
+  newField.appendChild(strengthMeter.el);
+
+  fNew.addEventListener("input", () => strengthMeter.update(fNew.value));
+
   body.appendChild(buildField("Current Password", fCurrent));
-  body.appendChild(buildField("New Password", fNew));
+  body.appendChild(newField);
   body.appendChild(buildField("Confirm New Password", fConfirm));
 
   const { errEl, cancelBtn, saveBtn } = appendModalFooter(body, {
@@ -296,13 +302,18 @@ function openChangePasswordModal() {
       errEl.style.display = "block";
       return;
     }
-    if (newPassword.length < 6) {
-      errEl.textContent = "New password must be at least 6 characters.";
+    if (!isPasswordStrongEnough(newPassword)) {
+      errEl.textContent = "Password is too weak. Use at least 8 characters with a mix of uppercase, lowercase, numbers, and symbols.";
       errEl.style.display = "block";
       return;
     }
     if (newPassword !== confirmPassword) {
       errEl.textContent = "New passwords do not match.";
+      errEl.style.display = "block";
+      return;
+    }
+    if (newPassword === currentPassword) {
+      errEl.textContent = "New password must be different from your current password.";
       errEl.style.display = "block";
       return;
     }
