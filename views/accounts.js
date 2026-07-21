@@ -160,13 +160,19 @@ function renderAccounts(db, onDbChange) {
     const fEmp = makeSelect(empOpts, data.employee_id ?? "");
     const fUser = makeInput("text", data.username, "username");
     const fEmail = makeInput("email", data.email, "email@corp.ph");
-    const fPw = makeInput("password", "", "password");
+    const fPw = makeInput("password", "", isEdit ? "Leave blank to keep current password" : "At least 8 characters, mixed case, number & symbol");
     const fAccess = makeSelect([["system_admin", "System Admin"], ["employee", "Employee"],["human_resources", "Human Resources"],["supervisor", "Supervisor"]], data.access_level);
 
     body.appendChild(buildField("Linked Employee (optional)", fEmp));
     body.appendChild(buildField("Username", fUser));
     body.appendChild(buildField("Email", fEmail));
-    body.appendChild(buildField(isEdit ? "New Password (leave blank to keep)" : "Password", fPw));
+
+    const pwField = buildField(isEdit ? "New Password (leave blank to keep)" : "Password", fPw);
+    const strengthMeter = buildPasswordStrengthMeter();
+    pwField.appendChild(strengthMeter.el);
+    fPw.addEventListener("input", () => strengthMeter.update(fPw.value));
+    body.appendChild(pwField);
+
     body.appendChild(buildField("Access Level", fAccess));
 
     const errEl = document.createElement("div");
@@ -201,7 +207,7 @@ function renderAccounts(db, onDbChange) {
       if (!username) { errEl.textContent = "Username is required."; errEl.style.display = "block"; return; }
       if (!email) { errEl.textContent = "Email is required."; errEl.style.display = "block"; return; }
       if (!isEdit && !pw) { errEl.textContent = "Password is required."; errEl.style.display = "block"; return; }
-      if (pw && pw.length < 6) { errEl.textContent = "Password must be at least 6 characters."; errEl.style.display = "block"; return; }
+      if (pw && !isPasswordStrongEnough(pw)) { errEl.textContent = "Password is too weak. Use at least 8 characters with a mix of uppercase, lowercase, numbers, and symbols."; errEl.style.display = "block"; return; }
 
       const employeeId = fEmp.value === "" ? null : Number(fEmp.value);
 
